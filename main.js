@@ -136,7 +136,7 @@ const WORLDS = [
   {
     name: 'Cloud Kingdom',
     sky: new THREE.Color(0x0a1628),
-    ground: new THREE.Color(0x1a2a3a),
+    ground: new THREE.Color(0x0a1520),
     chair: new THREE.Color(0xf0e8dd),
     ambient: 0.15,
     lightColor: 0x6688bb,
@@ -415,8 +415,233 @@ function createEnvironmentObjects() {
       scene.add(cloudGroup);
       environmentObjects.push(cloudGroup);
     }
+
+    // Cloud flowers - stem with tiny cloud on top
+    flowerMeshes = [];
+    const flowerColors = [
+      0x888899, // Grey blue
+      0x909090, // Medium grey
+      0x7a7a8a, // Darker grey
+      0x9a9aaa  // Soft grey
+    ];
+
+    for (let i = 0; i < 150; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 150 + Math.random() * 1500;
+
+      const flower = new THREE.Group();
+      const color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+      const stemHeight = 30 + Math.random() * 50;
+
+      // Store for animation
+      flower.userData = {
+        swaySpeed: 0.5 + Math.random() * 0.5,
+        swayOffset: Math.random() * Math.PI * 2,
+        swayAmount: 0.05 + Math.random() * 0.05
+      };
+      flowerMeshes.push(flower);
+
+      // Stem
+      const stemGeo = new THREE.CylinderGeometry(1.5, 2.5, stemHeight, 6);
+      const stemMat = new THREE.MeshStandardMaterial({
+        color: 0x2a5a2a,
+        roughness: 0.9
+      });
+      const stem = new THREE.Mesh(stemGeo, stemMat);
+      stem.position.y = stemHeight / 2;
+      flower.add(stem);
+
+      // Tiny cloud bloom on top
+      const cloudBloom = new THREE.Group();
+      const numPuffs = 3 + Math.floor(Math.random() * 3);
+      for (let j = 0; j < numPuffs; j++) {
+        const puffSize = 6 + Math.random() * 8;
+        const puffGeo = new THREE.SphereGeometry(puffSize, 8, 8);
+        const puffMat = new THREE.MeshStandardMaterial({
+          color: color,
+          emissive: color,
+          emissiveIntensity: 0.15,
+          roughness: 1,
+          metalness: 0
+        });
+
+        const puff = new THREE.Mesh(puffGeo, puffMat);
+        puff.position.set(
+          (Math.random() - 0.5) * 12,
+          (Math.random() - 0.5) * 6,
+          (Math.random() - 0.5) * 12
+        );
+        puff.scale.y = 0.6;
+
+        cloudBloom.add(puff);
+      }
+      cloudBloom.position.y = stemHeight;
+      flower.add(cloudBloom);
+
+      // Small leaves on stem
+      for (let k = 0; k < 2; k++) {
+        const leafGeo = new THREE.SphereGeometry(5, 4, 4);
+        const leafMat = new THREE.MeshStandardMaterial({
+          color: 0x3a7a3a,
+          roughness: 0.8
+        });
+        const leaf = new THREE.Mesh(leafGeo, leafMat);
+        leaf.position.set(
+          (Math.random() - 0.5) * 8,
+          stemHeight * (0.3 + k * 0.3),
+          (Math.random() - 0.5) * 8
+        );
+        leaf.scale.set(1, 0.3, 0.6);
+        flower.add(leaf);
+      }
+
+      flower.position.set(
+        Math.cos(angle) * dist,
+        0,
+        Math.sin(angle) * dist
+      );
+
+      // Slight random tilt
+      flower.rotation.x = (Math.random() - 0.5) * 0.2;
+      flower.rotation.z = (Math.random() - 0.5) * 0.2;
+
+      scene.add(flower);
+      environmentObjects.push(flower);
+    }
+
+    // === REALISTIC MOON ===
+    const moonPos = new THREE.Vector3(-2500, 1000, -3500);
+
+    // Moon core - bright center
+    const moonCoreGeo = new THREE.SphereGeometry(180, 64, 64);
+    const moonCoreMat = new THREE.MeshBasicMaterial({
+      color: 0xfffff8
+    });
+    const moonCore = new THREE.Mesh(moonCoreGeo, moonCoreMat);
+    moonCore.position.copy(moonPos);
+    scene.add(moonCore);
+    environmentObjects.push(moonCore);
+
+    // Moon surface with subtle variation
+    const moonSurfaceGeo = new THREE.SphereGeometry(182, 64, 64);
+    const moonSurfaceMat = new THREE.MeshStandardMaterial({
+      color: 0xeeeee8,
+      emissive: 0xffffee,
+      emissiveIntensity: 0.8,
+      roughness: 0.9,
+      metalness: 0,
+      transparent: true,
+      opacity: 0.6
+    });
+    const moonSurface = new THREE.Mesh(moonSurfaceGeo, moonSurfaceMat);
+    moonSurface.position.copy(moonPos);
+    scene.add(moonSurface);
+    environmentObjects.push(moonSurface);
+
+    // Inner glow
+    const moonGlow1Geo = new THREE.SphereGeometry(220, 32, 32);
+    const moonGlow1Mat = new THREE.MeshBasicMaterial({
+      color: 0xffffee,
+      transparent: true,
+      opacity: 0.4
+    });
+    const moonGlow1 = new THREE.Mesh(moonGlow1Geo, moonGlow1Mat);
+    moonGlow1.position.copy(moonPos);
+    scene.add(moonGlow1);
+    environmentObjects.push(moonGlow1);
+
+    // Mid glow
+    const moonGlow2Geo = new THREE.SphereGeometry(300, 32, 32);
+    const moonGlow2Mat = new THREE.MeshBasicMaterial({
+      color: 0xddeeff,
+      transparent: true,
+      opacity: 0.15
+    });
+    const moonGlow2 = new THREE.Mesh(moonGlow2Geo, moonGlow2Mat);
+    moonGlow2.position.copy(moonPos);
+    scene.add(moonGlow2);
+    environmentObjects.push(moonGlow2);
+
+    // Outer glow - large atmospheric haze
+    const moonGlow3Geo = new THREE.SphereGeometry(500, 32, 32);
+    const moonGlow3Mat = new THREE.MeshBasicMaterial({
+      color: 0x8899bb,
+      transparent: true,
+      opacity: 0.06
+    });
+    const moonGlow3 = new THREE.Mesh(moonGlow3Geo, moonGlow3Mat);
+    moonGlow3.position.copy(moonPos);
+    scene.add(moonGlow3);
+    environmentObjects.push(moonGlow3);
+
+    // Moon light - casts light into scene
+    const moonLight = new THREE.DirectionalLight(0xaabbdd, 0.5);
+    moonLight.position.copy(moonPos);
+    moonLight.target.position.set(0, 0, 0);
+    scene.add(moonLight);
+    scene.add(moonLight.target);
+    environmentObjects.push(moonLight);
+
+    // === FLOATING MAGIC PARTICLES ===
+    magicParticles = [];
+    for (let i = 0; i < 100; i++) {
+      const particleGeo = new THREE.SphereGeometry(2 + Math.random() * 3, 6, 6);
+      const particleMat = new THREE.MeshBasicMaterial({
+        color: 0xaaccff,
+        transparent: true,
+        opacity: 0.4 + Math.random() * 0.4
+      });
+      const magicParticle = new THREE.Mesh(particleGeo, particleMat);
+      magicParticle.position.set(
+        (Math.random() - 0.5) * 2000,
+        50 + Math.random() * 500,
+        (Math.random() - 0.5) * 2000
+      );
+      magicParticle.userData = {
+        floatSpeed: 0.2 + Math.random() * 0.3,
+        floatOffset: Math.random() * Math.PI * 2,
+        baseY: magicParticle.position.y,
+        driftX: (Math.random() - 0.5) * 0.5,
+        driftZ: (Math.random() - 0.5) * 0.5
+      };
+      scene.add(magicParticle);
+      environmentObjects.push(magicParticle);
+      magicParticles.push(magicParticle);
+    }
+
+    // === CHAIR SPOTLIGHT ===
+    const spotLight = new THREE.SpotLight(0x6688cc, 3);
+    spotLight.position.set(0, 1500, 0);
+    spotLight.target.position.set(0, 0, 0);
+    spotLight.angle = Math.PI / 8;
+    spotLight.penumbra = 0.8;
+    spotLight.decay = 1;
+    spotLight.distance = 2500;
+    scene.add(spotLight);
+    scene.add(spotLight.target);
+    environmentObjects.push(spotLight);
+
+    // === GROUND GLOW RING around chair ===
+    const glowRingGeo = new THREE.RingGeometry(300, 600, 64);
+    const glowRingMat = new THREE.MeshBasicMaterial({
+      color: 0x4466aa,
+      transparent: true,
+      opacity: 0.08,
+      side: THREE.DoubleSide
+    });
+    const glowRing = new THREE.Mesh(glowRingGeo, glowRingMat);
+    glowRing.rotation.x = -Math.PI / 2;
+    glowRing.position.y = 2;
+    scene.add(glowRing);
+    environmentObjects.push(glowRing);
   }
 }
+
+// Track magic particles for animation
+let magicParticles = [];
+let flowerMeshes = [];
+let petals = [];
+let fireflies = [];
 
 // ============================================
 // Particles System
@@ -689,6 +914,26 @@ function animate() {
     if (cloud.material.uniforms) {
       cloud.material.uniforms.uTime.value = time;
     }
+  });
+
+  // Animate magic particles - float upward and drift
+  magicParticles.forEach(p => {
+    const { floatSpeed, floatOffset, baseY, driftX, driftZ } = p.userData;
+    p.position.y = baseY + Math.sin(time * floatSpeed + floatOffset) * 30;
+    p.position.y += time * 2 % 600; // Slow rise
+    p.position.x += driftX;
+    p.position.z += driftZ;
+
+    // Reset when too high
+    if (p.position.y > 600) {
+      p.position.y = 50;
+      p.position.x = (Math.random() - 0.5) * 2000;
+      p.position.z = (Math.random() - 0.5) * 2000;
+      p.userData.baseY = p.position.y;
+    }
+
+    // Pulse opacity
+    p.material.opacity = 0.3 + Math.sin(time * 2 + floatOffset) * 0.3;
   });
 
   renderer.render(scene, camera);
