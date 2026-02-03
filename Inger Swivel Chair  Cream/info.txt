@@ -1,0 +1,15 @@
+Name: Inger_Swivel_Chair_Cream
+Version: 2017
+Preview: Yes
+Units: Millimeters
+Dimension: 1157.69 x 1172.16 x 665.41
+Polys: 1 168
+Verts: 1 205
+XForm: Yes
+Box Trick: Yes
+Model Parts: 2
+Render: Vray
+Formats: 3Ds Max 2017, OBJ, FBX
+
+
+Link: https://3ddd.ru/3dmodels/show/inger_swivel_chair_cream
