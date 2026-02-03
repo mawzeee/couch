@@ -127,6 +127,177 @@ void main() {
 `;
 
 let cloudMeshes = [];
+let moonMesh = null;
+
+// ============================================
+// Realistic Moon Shader
+// ============================================
+
+const moonVertexShader = `
+varying vec2 vUv;
+varying vec3 vNormal;
+varying vec3 vPosition;
+
+void main() {
+  vUv = uv;
+  vNormal = normalize(normalMatrix * normal);
+  vPosition = position;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const moonFragmentShader = `
+uniform float uTime;
+uniform vec3 uLightDir;
+varying vec2 vUv;
+varying vec3 vNormal;
+varying vec3 vPosition;
+
+// Simplex noise
+vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+float snoise(vec3 v) {
+  const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+  vec3 i  = floor(v + dot(v, C.yyy));
+  vec3 x0 = v - i + dot(i, C.xxx);
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min(g.xyz, l.zxy);
+  vec3 i2 = max(g.xyz, l.zxy);
+  vec3 x1 = x0 - i1 + C.xxx;
+  vec3 x2 = x0 - i2 + C.yyy;
+  vec3 x3 = x0 - D.yyy;
+  i = mod289(i);
+  vec4 p = permute(permute(permute(i.z + vec4(0.0, i1.z, i2.z, 1.0)) + i.y + vec4(0.0, i1.y, i2.y, 1.0)) + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+  float n_ = 0.142857142857;
+  vec3 ns = n_ * D.wyz - D.xzx;
+  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+  vec4 x_ = floor(j * ns.z);
+  vec4 y_ = floor(j - 7.0 * x_);
+  vec4 x = x_ *ns.x + ns.yyyy;
+  vec4 y = y_ *ns.x + ns.yyyy;
+  vec4 h = 1.0 - abs(x) - abs(y);
+  vec4 b0 = vec4(x.xy, y.xy);
+  vec4 b1 = vec4(x.zw, y.zw);
+  vec4 s0 = floor(b0)*2.0 + 1.0;
+  vec4 s1 = floor(b1)*2.0 + 1.0;
+  vec4 sh = -step(h, vec4(0.0));
+  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+  vec3 p0 = vec3(a0.xy, h.x);
+  vec3 p1 = vec3(a0.zw, h.y);
+  vec3 p2 = vec3(a1.xy, h.z);
+  vec3 p3 = vec3(a1.zw, h.w);
+  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+  p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  m = m * m;
+  return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+}
+
+// Fractional Brownian Motion for detailed surface
+float fbm(vec3 p, int octaves) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  float frequency = 1.0;
+  for (int i = 0; i < 8; i++) {
+    if (i >= octaves) break;
+    value += amplitude * snoise(p * frequency);
+    amplitude *= 0.5;
+    frequency *= 2.0;
+  }
+  return value;
+}
+
+void main() {
+  vec3 normal = normalize(vNormal);
+  vec3 pos = normalize(vPosition);
+
+  // Light direction - coming from the right side to create terminator
+  vec3 lightDir = normalize(uLightDir);
+
+  // Basic diffuse lighting with soft terminator
+  float NdotL = dot(normal, lightDir);
+  float diffuse = smoothstep(-0.1, 0.3, NdotL);
+
+  // === LUNAR MARIA (dark patches) ===
+  // Large scale noise for maria distribution
+  float maria = snoise(pos * 1.5 + vec3(0.5, 0.2, 0.8));
+  maria = smoothstep(0.0, 0.4, maria);
+
+  // Add some variation to maria
+  float mariaDetail = snoise(pos * 3.0 + vec3(1.2, 0.5, 0.3));
+  maria *= 0.7 + mariaDetail * 0.3;
+
+  // === HIGHLANDS (bright regions) ===
+  float highlands = 1.0 - maria;
+
+  // === CRATER DETAIL ===
+  // Large craters
+  float largeCraters = snoise(pos * 8.0);
+  largeCraters = smoothstep(0.4, 0.6, largeCraters) * 0.3;
+
+  // Medium craters
+  float medCraters = snoise(pos * 20.0 + vec3(5.0));
+  medCraters = smoothstep(0.5, 0.7, medCraters) * 0.2;
+
+  // Small craters / surface texture
+  float smallDetail = fbm(pos * 40.0, 4) * 0.1;
+
+  // Crater rims (bright edges)
+  float craterRims = snoise(pos * 15.0 + vec3(2.0));
+  craterRims = smoothstep(0.3, 0.35, craterRims) * smoothstep(0.45, 0.4, craterRims);
+  craterRims *= 0.15;
+
+  // === COMBINE COLORS ===
+  // Maria color (darker, slightly blue-grey)
+  vec3 mariaColor = vec3(0.45, 0.45, 0.48);
+
+  // Highlands color (brighter, warm grey)
+  vec3 highlandsColor = vec3(0.75, 0.73, 0.70);
+
+  // Mix based on maria distribution
+  vec3 baseColor = mix(highlandsColor, mariaColor, maria);
+
+  // Add crater darkening
+  baseColor -= vec3(largeCraters + medCraters);
+
+  // Add crater rim highlights
+  baseColor += vec3(craterRims);
+
+  // Add fine surface detail
+  baseColor += vec3(smallDetail);
+
+  // === APPLY LIGHTING ===
+  // Ambient (very subtle, representing earthshine)
+  vec3 ambient = baseColor * 0.08;
+
+  // Diffuse lighting
+  vec3 litColor = baseColor * diffuse;
+
+  // Combine
+  vec3 finalColor = ambient + litColor;
+
+  // === LIMB DARKENING (subtle) ===
+  float limbDark = pow(1.0 - abs(dot(normal, vec3(0.0, 0.0, 1.0))), 0.5);
+  finalColor *= 1.0 - limbDark * 0.15;
+
+  // === TERMINATOR DETAIL ===
+  // Enhanced detail visibility near the terminator
+  float terminatorZone = smoothstep(0.0, 0.3, NdotL) * smoothstep(0.6, 0.3, NdotL);
+  float terminatorDetail = fbm(pos * 25.0, 3) * terminatorZone * 0.1;
+  finalColor += vec3(terminatorDetail);
+
+  // Boost overall brightness slightly
+  finalColor *= 1.1;
+
+  gl_FragColor = vec4(finalColor, 1.0);
+}
+`;
 
 // ============================================
 // CHROMATIC REALMS - Actual World Environments
@@ -262,7 +433,7 @@ ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
 scene.add(ambientLight);
 
 // ============================================
-// Ground - Large environment floor
+// Ground - Large environment floor with grass
 // ============================================
 
 const groundGeo = new THREE.CircleGeometry(3000, 64);
@@ -276,6 +447,202 @@ groundMesh.rotation.x = -Math.PI / 2;
 groundMesh.position.y = -10;
 groundMesh.receiveShadow = true;
 scene.add(groundMesh);
+
+// Ground stars - subtle glowing points
+let groundStars = [];
+
+function createGroundStars() {
+  groundStars.forEach(s => scene.remove(s));
+  groundStars = [];
+
+  const starCount = 30;
+
+  for (let i = 0; i < starCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 200 + Math.random() * 1200;
+
+    // Star point
+    const starGeo = new THREE.SphereGeometry(3, 8, 8);
+    const starMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.6
+    });
+    const star = new THREE.Mesh(starGeo, starMat);
+    star.position.set(
+      Math.cos(angle) * dist,
+      2,
+      Math.sin(angle) * dist
+    );
+
+    // Subtle glow around each star
+    const glowGeo = new THREE.SphereGeometry(8, 8, 8);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0xaaccff,
+      transparent: true,
+      opacity: 0.2,
+      blending: THREE.AdditiveBlending
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.copy(star.position);
+
+    star.userData = {
+      glow: glow,
+      pulseOffset: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.5 + Math.random() * 0.5,
+      baseOpacity: 0.4 + Math.random() * 0.3
+    };
+
+    scene.add(star);
+    scene.add(glow);
+    groundStars.push(star);
+    environmentObjects.push(star);
+    environmentObjects.push(glow);
+  }
+}
+
+// ============================================
+// Lightning System
+// ============================================
+
+function createLightningBolt(startPos) {
+  const bolt = new THREE.Group();
+  const segments = [];
+
+  // Main bolt path - jagged downward
+  let currentPos = startPos.clone();
+  const endY = 100 + Math.random() * 200;
+  const numSegments = 8 + Math.floor(Math.random() * 6);
+
+  for (let i = 0; i < numSegments; i++) {
+    const t = i / numSegments;
+    const nextPos = new THREE.Vector3(
+      currentPos.x + (Math.random() - 0.5) * 150,
+      currentPos.y - (startPos.y - endY) / numSegments,
+      currentPos.z + (Math.random() - 0.5) * 150
+    );
+
+    segments.push({ start: currentPos.clone(), end: nextPos.clone() });
+
+    // Add branches occasionally
+    if (Math.random() > 0.6 && i > 1 && i < numSegments - 2) {
+      const branchLength = 2 + Math.floor(Math.random() * 3);
+      let branchPos = currentPos.clone();
+      const branchDir = Math.random() > 0.5 ? 1 : -1;
+
+      for (let b = 0; b < branchLength; b++) {
+        const branchNext = new THREE.Vector3(
+          branchPos.x + branchDir * (50 + Math.random() * 50),
+          branchPos.y - 30 - Math.random() * 40,
+          branchPos.z + (Math.random() - 0.5) * 60
+        );
+        segments.push({ start: branchPos.clone(), end: branchNext.clone(), isBranch: true });
+        branchPos = branchNext;
+      }
+    }
+
+    currentPos = nextPos;
+  }
+
+  // Create geometry for each segment
+  segments.forEach(seg => {
+    const dir = new THREE.Vector3().subVectors(seg.end, seg.start);
+    const length = dir.length();
+    const thickness = seg.isBranch ? 2 : 4;
+
+    // Core bright line
+    const coreGeo = new THREE.CylinderGeometry(thickness, thickness * 0.5, length, 6);
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 1
+    });
+    const core = new THREE.Mesh(coreGeo, coreMat);
+
+    // Position and orient
+    const midpoint = new THREE.Vector3().addVectors(seg.start, seg.end).multiplyScalar(0.5);
+    core.position.copy(midpoint);
+    core.lookAt(seg.end);
+    core.rotateX(Math.PI / 2);
+
+    bolt.add(core);
+
+    // Glow
+    const glowGeo = new THREE.CylinderGeometry(thickness * 4, thickness * 2, length, 6);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0x88aaff,
+      transparent: true,
+      opacity: 0.4,
+      blending: THREE.AdditiveBlending
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.copy(midpoint);
+    glow.lookAt(seg.end);
+    glow.rotateX(Math.PI / 2);
+
+    bolt.add(glow);
+  });
+
+  bolt.userData = {
+    life: 1.0,
+    fadeSpeed: 3 + Math.random() * 2
+  };
+
+  scene.add(bolt);
+  lightningBolts.push(bolt);
+
+  // Trigger scene flash
+  sceneLightningFlash = 0.8;
+
+  return bolt;
+}
+
+function triggerLightning() {
+  // Pick a random cloud position
+  const cloudPositions = [];
+  environmentObjects.forEach(obj => {
+    if (obj.isGroup && obj.position.y > 500) {
+      cloudPositions.push(obj.position.clone());
+    }
+  });
+
+  if (cloudPositions.length > 0) {
+    const cloudPos = cloudPositions[Math.floor(Math.random() * cloudPositions.length)];
+    // Start slightly below cloud
+    const startPos = new THREE.Vector3(
+      cloudPos.x + (Math.random() - 0.5) * 200,
+      cloudPos.y - 50,
+      cloudPos.z + (Math.random() - 0.5) * 200
+    );
+    createLightningBolt(startPos);
+  }
+}
+
+function updateLightning(deltaTime) {
+  // Update existing bolts
+  for (let i = lightningBolts.length - 1; i >= 0; i--) {
+    const bolt = lightningBolts[i];
+    bolt.userData.life -= deltaTime * bolt.userData.fadeSpeed;
+
+    // Fade out
+    bolt.children.forEach(child => {
+      if (child.material) {
+        child.material.opacity = bolt.userData.life * (child.material.color.r > 0.9 ? 1 : 0.4);
+      }
+    });
+
+    // Remove when dead
+    if (bolt.userData.life <= 0) {
+      scene.remove(bolt);
+      lightningBolts.splice(i, 1);
+    }
+  }
+
+  // Fade scene flash
+  if (sceneLightningFlash > 0) {
+    sceneLightningFlash -= deltaTime * 4;
+  }
+}
 
 // ============================================
 // Environment Objects (trees, rocks, etc.)
@@ -510,81 +877,96 @@ function createEnvironmentObjects() {
     }
 
     // === REALISTIC MOON ===
-    const moonPos = new THREE.Vector3(-2500, 1000, -3500);
+    const moonPos = new THREE.Vector3(-1500, 900, -2000);
 
-    // Moon core - bright center
-    const moonCoreGeo = new THREE.SphereGeometry(180, 64, 64);
-    const moonCoreMat = new THREE.MeshBasicMaterial({
-      color: 0xfffff8
+    // Light direction for the moon shader (creates the terminator/phase)
+    const moonLightDir = new THREE.Vector3(1.0, 0.2, 0.5).normalize();
+
+    // Main moon with realistic shader
+    const moonGeo = new THREE.SphereGeometry(280, 128, 128);
+    const moonMat = new THREE.ShaderMaterial({
+      vertexShader: moonVertexShader,
+      fragmentShader: moonFragmentShader,
+      uniforms: {
+        uTime: { value: 0 },
+        uLightDir: { value: moonLightDir }
+      }
     });
-    const moonCore = new THREE.Mesh(moonCoreGeo, moonCoreMat);
-    moonCore.position.copy(moonPos);
-    scene.add(moonCore);
-    environmentObjects.push(moonCore);
+    moonMesh = new THREE.Mesh(moonGeo, moonMat);
+    moonMesh.position.copy(moonPos);
+    scene.add(moonMesh);
+    environmentObjects.push(moonMesh);
 
-    // Moon surface with subtle variation
-    const moonSurfaceGeo = new THREE.SphereGeometry(182, 64, 64);
-    const moonSurfaceMat = new THREE.MeshStandardMaterial({
-      color: 0xeeeee8,
-      emissive: 0xffffee,
-      emissiveIntensity: 0.8,
-      roughness: 0.9,
-      metalness: 0,
+    // Subtle atmospheric glow - single soft halo
+    const glowGeo = new THREE.SphereGeometry(320, 64, 64);
+    const glowMat = new THREE.ShaderMaterial({
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        void main() {
+          float intensity = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+          vec3 glowColor = vec3(0.8, 0.85, 0.95);
+          gl_FragColor = vec4(glowColor, intensity * 0.4);
+        }
+      `,
       transparent: true,
-      opacity: 0.6
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false
     });
-    const moonSurface = new THREE.Mesh(moonSurfaceGeo, moonSurfaceMat);
-    moonSurface.position.copy(moonPos);
-    scene.add(moonSurface);
-    environmentObjects.push(moonSurface);
+    const moonGlow = new THREE.Mesh(glowGeo, glowMat);
+    moonGlow.position.copy(moonPos);
+    scene.add(moonGlow);
+    environmentObjects.push(moonGlow);
 
-    // Inner glow
-    const moonGlow1Geo = new THREE.SphereGeometry(220, 32, 32);
-    const moonGlow1Mat = new THREE.MeshBasicMaterial({
-      color: 0xffffee,
+    // Very subtle outer haze
+    const hazeGeo = new THREE.SphereGeometry(450, 32, 32);
+    const hazeMat = new THREE.ShaderMaterial({
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        void main() {
+          float intensity = pow(0.5 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0);
+          vec3 hazeColor = vec3(0.6, 0.7, 0.85);
+          gl_FragColor = vec4(hazeColor, intensity * 0.15);
+        }
+      `,
       transparent: true,
-      opacity: 0.4
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false
     });
-    const moonGlow1 = new THREE.Mesh(moonGlow1Geo, moonGlow1Mat);
-    moonGlow1.position.copy(moonPos);
-    scene.add(moonGlow1);
-    environmentObjects.push(moonGlow1);
+    const moonHaze = new THREE.Mesh(hazeGeo, hazeMat);
+    moonHaze.position.copy(moonPos);
+    scene.add(moonHaze);
+    environmentObjects.push(moonHaze);
 
-    // Mid glow
-    const moonGlow2Geo = new THREE.SphereGeometry(300, 32, 32);
-    const moonGlow2Mat = new THREE.MeshBasicMaterial({
-      color: 0xddeeff,
-      transparent: true,
-      opacity: 0.15
-    });
-    const moonGlow2 = new THREE.Mesh(moonGlow2Geo, moonGlow2Mat);
-    moonGlow2.position.copy(moonPos);
-    scene.add(moonGlow2);
-    environmentObjects.push(moonGlow2);
-
-    // Outer glow - large atmospheric haze
-    const moonGlow3Geo = new THREE.SphereGeometry(500, 32, 32);
-    const moonGlow3Mat = new THREE.MeshBasicMaterial({
-      color: 0x8899bb,
-      transparent: true,
-      opacity: 0.06
-    });
-    const moonGlow3 = new THREE.Mesh(moonGlow3Geo, moonGlow3Mat);
-    moonGlow3.position.copy(moonPos);
-    scene.add(moonGlow3);
-    environmentObjects.push(moonGlow3);
-
-    // Moon light - casts light into scene
-    const moonLight = new THREE.DirectionalLight(0xaabbdd, 0.5);
+    // Moon light casting into scene - subtle
+    const moonLight = new THREE.DirectionalLight(0x9aaccff, 0.8);
     moonLight.position.copy(moonPos);
     moonLight.target.position.set(0, 0, 0);
     scene.add(moonLight);
     scene.add(moonLight.target);
     environmentObjects.push(moonLight);
 
+    // Create ground stars for this world
+    createGroundStars();
+
     // === FLOATING MAGIC PARTICLES ===
     magicParticles = [];
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 30; i++) {
       const particleGeo = new THREE.SphereGeometry(2 + Math.random() * 3, 6, 6);
       const particleMat = new THREE.MeshBasicMaterial({
         color: 0xaaccff,
@@ -634,14 +1016,20 @@ function createEnvironmentObjects() {
     glowRing.position.y = 2;
     scene.add(glowRing);
     environmentObjects.push(glowRing);
+
+
   }
 }
 
 // Track magic particles for animation
 let magicParticles = [];
 let flowerMeshes = [];
-let petals = [];
-let fireflies = [];
+
+// Lightning system
+let lightningBolts = [];
+let lightningTimer = 0;
+let lightningInterval = 1 + Math.random() * 2;
+let sceneLightningFlash = 0;
 
 // ============================================
 // Particles System
@@ -901,9 +1289,12 @@ createSliderUI();
 
 const clock = new THREE.Clock();
 
+let lastTime = 0;
 function animate() {
   requestAnimationFrame(animate);
   const time = clock.getElapsedTime();
+  const deltaTime = time - lastTime;
+  lastTime = time;
 
   controls.update();
   updateWorldTransition();
@@ -915,6 +1306,13 @@ function animate() {
       cloud.material.uniforms.uTime.value = time;
     }
   });
+
+  // Update moon shader - very slow rotation to show surface detail
+  if (moonMesh && moonMesh.material.uniforms) {
+    moonMesh.material.uniforms.uTime.value = time;
+    // Extremely slow rotation, almost imperceptible
+    moonMesh.rotation.y = time * 0.002;
+  }
 
   // Animate magic particles - float upward and drift
   magicParticles.forEach(p => {
@@ -935,6 +1333,44 @@ function animate() {
     // Pulse opacity
     p.material.opacity = 0.3 + Math.sin(time * 2 + floatOffset) * 0.3;
   });
+
+  // Animate flowers - gentle sway
+  flowerMeshes.forEach(flower => {
+    const { swaySpeed, swayOffset, swayAmount } = flower.userData;
+    flower.rotation.x = Math.sin(time * swaySpeed + swayOffset) * swayAmount;
+    flower.rotation.z = Math.cos(time * swaySpeed * 0.7 + swayOffset) * swayAmount;
+  });
+
+
+
+  // Animate ground stars - gentle pulse
+  groundStars.forEach(star => {
+    const { glow, pulseOffset, pulseSpeed, baseOpacity } = star.userData;
+    const pulse = Math.sin(time * pulseSpeed + pulseOffset) * 0.5 + 0.5;
+    star.material.opacity = baseOpacity * (0.6 + pulse * 0.4);
+    if (glow) {
+      glow.material.opacity = 0.15 + pulse * 0.15;
+    }
+  });
+
+  // Lightning system - only in Cloud Kingdom
+  if (WORLDS[targetWorld].name === 'Cloud Kingdom') {
+    // Random lightning triggers
+    lightningTimer += deltaTime;
+    if (lightningTimer > lightningInterval) {
+      lightningTimer = 0;
+      lightningInterval = 0.5 + Math.random() * 2; // 0.5-2.5 seconds between strikes
+      triggerLightning();
+    }
+
+    // Update existing lightning
+    updateLightning(deltaTime);
+
+    // Apply scene flash (subtle ambient boost)
+    if (sceneLightningFlash > 0) {
+      ambientLight.intensity = WORLDS[targetWorld].ambient + sceneLightningFlash * 0.5;
+    }
+  }
 
   renderer.render(scene, camera);
 }
