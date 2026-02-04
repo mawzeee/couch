@@ -361,6 +361,90 @@ const WORLDS = [
   }
 ];
 
+// Realm content for typography overlay
+const REALM_CONTENT = [
+  {
+    accent: '#8B9FD4',
+    label: 'Cloud Kingdom',
+    name: 'Cumulus',
+    variant: 'Swivel Chair',
+    description: 'Cloud-soft bouclé curves cradle you in weightless comfort. Each pleat catches light like morning mist.',
+    material: 'Bouclé Wool',
+    width: '95 cm',
+    depth: '92 cm',
+    height: '78 cm',
+    price: '$4,200'
+  },
+  {
+    accent: '#7BA882',
+    label: 'Enchanted Forest',
+    name: 'Stratus',
+    variant: 'Swivel Chair',
+    description: 'Velvet depths inspired by forest canopy at twilight. Sink into emerald shadows.',
+    material: 'Velvet Cotton',
+    width: '95 cm',
+    depth: '92 cm',
+    height: '78 cm',
+    price: '$4,400'
+  },
+  {
+    accent: '#C8945C',
+    label: 'Desert Dusk',
+    name: 'Cirrus',
+    variant: 'Swivel Chair',
+    description: 'Warm terracotta tones echo sandstone at golden hour. Stillness in the expanse.',
+    material: 'Linen Blend',
+    width: '95 cm',
+    depth: '92 cm',
+    height: '78 cm',
+    price: '$3,800'
+  },
+  {
+    accent: '#4AA8C8',
+    label: 'Deep Ocean',
+    name: 'Nimbus',
+    variant: 'Swivel Chair',
+    description: 'Midnight blue channels the weight of water, the silence of the deep.',
+    material: 'Silk Velvet',
+    width: '95 cm',
+    depth: '92 cm',
+    height: '78 cm',
+    price: '$5,200'
+  },
+  {
+    accent: '#A0A0A0',
+    label: 'Lunar Surface',
+    name: 'Alto',
+    variant: 'Swivel Chair',
+    description: "Silver-grey mirrors the moon's ancient face. Cold beauty, warm embrace.",
+    material: 'Technical Wool',
+    width: '95 cm',
+    depth: '92 cm',
+    height: '78 cm',
+    price: '$4,600'
+  }
+];
+
+function updateRealmContent(index) {
+  const content = REALM_CONTENT[index];
+  const total = REALM_CONTENT.length;
+
+  // Update CSS accent color
+  document.documentElement.style.setProperty('--accent', content.accent);
+
+  // Update text content
+  document.getElementById('realm-label').textContent = content.label;
+  document.getElementById('chair-name').textContent = content.name;
+  document.getElementById('chair-variant').textContent = content.variant;
+  document.getElementById('description-text').textContent = content.description;
+  document.getElementById('spec-material').textContent = content.material;
+  document.getElementById('spec-width').textContent = content.width;
+  document.getElementById('spec-depth').textContent = content.depth;
+  document.getElementById('spec-height').textContent = content.height;
+  document.getElementById('price-value').textContent = content.price;
+  document.getElementById('index').textContent = String(index + 1).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
+}
+
 let currentWorld = 0;
 let targetWorld = 0;
 let chairMaterial, groundMesh, groundMaterial;
@@ -1202,8 +1286,10 @@ fbxLoader.load(
 
     loadingDiv.classList.add('hidden');
     document.getElementById('slider-container').classList.add('visible');
+    document.getElementById('ui-layer').classList.add('visible');
 
     // Initialize first world
+    updateRealmContent(0);
     createEnvironmentObjects();
     createParticles();
 
@@ -1226,6 +1312,7 @@ function transitionToWorld(index) {
   targetWorld = index;
   createEnvironmentObjects();
   createParticles();
+  updateRealmContent(index);
 }
 
 function updateWorldTransition() {

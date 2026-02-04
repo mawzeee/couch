@@ -5,8 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chromatic Realms</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --accent: #8B9FD4;
+      --line: rgba(255, 255, 255, 0.12);
+      --text-primary: rgba(255, 255, 255, 0.9);
+      --text-dim: rgba(255, 255, 255, 0.5);
+      --text-muted: rgba(255, 255, 255, 0.35);
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -16,24 +25,30 @@
     body {
       overflow: hidden;
       background: #0a1628;
-      font-family: 'Inter', sans-serif;
+      font-family: 'IBM Plex Mono', monospace;
     }
 
     canvas {
       display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
     }
 
+    /* Loading */
     #loading {
       position: fixed;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      color: #8899bb;
-      font-size: 13px;
+      color: var(--text-muted);
+      font-size: 10px;
       font-weight: 400;
-      letter-spacing: 0.2em;
+      letter-spacing: 0.15em;
       text-transform: uppercase;
-      z-index: 100;
+      z-index: 200;
       transition: opacity 0.6s ease;
     }
 
@@ -42,37 +57,179 @@
       pointer-events: none;
     }
 
-    /* Header */
-    .header {
+    /* ================================
+       ARCHITECTURAL OVERLAY
+       ================================ */
+
+    .ui-layer {
       position: fixed;
       top: 0;
       left: 0;
-      right: 0;
-      padding: 30px 50px;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+
+    .ui-layer.visible {
+      opacity: 1;
+    }
+
+    /* Top left - Brand */
+    .brand {
+      position: absolute;
+      top: 32px;
+      left: 40px;
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* Top right - Index */
+    .index {
+      position: absolute;
+      top: 32px;
+      right: 40px;
+      font-size: 9px;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+
+    /* Chair name - asymmetric position */
+    .chair-title {
+      position: absolute;
+      top: 140px;
+      left: 40px;
+    }
+
+    .chair-name {
+      font-family: 'Instrument Serif', serif;
+      font-size: 72px;
+      font-weight: 400;
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .chair-variant {
+      font-family: 'Instrument Serif', serif;
+      font-style: italic;
+      font-size: 32px;
+      font-weight: 400;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* Specs table - bottom left */
+    .specs-block {
+      position: absolute;
+      bottom: 120px;
+      left: 40px;
+      width: 200px;
+    }
+
+    .specs-table {
+      border-top: 1px solid var(--line);
+    }
+
+    .spec-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      z-index: 100;
-      pointer-events: none;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 9px;
+      letter-spacing: 0.05em;
     }
 
-    .logo {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.3em;
+    .spec-label {
+      color: var(--text-muted);
       text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.7);
     }
 
-    /* Slider */
+    .spec-value {
+      color: var(--text-dim);
+      text-align: right;
+    }
+
+    /* Price block - offset from specs */
+    .price-block {
+      position: absolute;
+      bottom: 120px;
+      left: 280px;
+    }
+
+    .price-label {
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .price-value {
+      font-family: 'Instrument Serif', serif;
+      font-size: 28px;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    /* Description - right side, vertically centered */
+    .description-block {
+      position: absolute;
+      right: 40px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 180px;
+      text-align: right;
+    }
+
+    .description-text {
+      font-size: 10px;
+      line-height: 1.7;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+
+    /* Vertical line accent */
+    .vertical-line {
+      position: absolute;
+      left: 40px;
+      top: 240px;
+      width: 1px;
+      height: 80px;
+      background: var(--line);
+    }
+
+    /* Realm indicator - bottom right */
+    .realm-indicator {
+      position: absolute;
+      bottom: 32px;
+      right: 40px;
+      text-align: right;
+    }
+
+    .realm-label {
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      transition: color 0.6s ease;
+    }
+
+    /* Realm navigation - bottom center */
     #slider-container {
       position: fixed;
-      bottom: 50px;
+      bottom: 28px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 100;
       opacity: 0;
-      transition: opacity 0.8s ease 0.5s;
+      transition: opacity 0.6s ease;
     }
 
     #slider-container.visible {
@@ -81,60 +238,106 @@
 
     .slider-track {
       display: flex;
-      gap: 8px;
-      padding: 8px;
-      background: rgba(0, 0, 0, 0.4);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 50px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      gap: 0;
     }
 
     .slider-btn {
-      padding: 12px 24px;
+      padding: 8px 16px;
       border: none;
       background: transparent;
-      color: rgba(255, 255, 255, 0.5);
-      font-family: inherit;
-      font-size: 11px;
-      font-weight: 500;
+      color: var(--text-muted);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 9px;
+      font-weight: 400;
       letter-spacing: 0.1em;
       text-transform: uppercase;
       cursor: pointer;
-      border-radius: 40px;
-      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      white-space: nowrap;
+      transition: color 0.3s ease;
+      pointer-events: auto;
+      border-left: 1px solid var(--line);
+    }
+
+    .slider-btn:first-child {
+      border-left: none;
     }
 
     .slider-btn:hover {
-      color: rgba(255, 255, 255, 0.8);
-      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-dim);
     }
 
     .slider-btn.active {
-      background: rgba(255, 255, 255, 0.15);
-      color: white;
+      color: var(--text-primary);
     }
 
-    /* Hint text */
+    /* Hint */
     .hint {
-      position: fixed;
-      bottom: 120px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.3);
+      position: absolute;
+      bottom: 32px;
+      left: 40px;
+      font-size: 9px;
       letter-spacing: 0.1em;
-      z-index: 100;
+      color: var(--text-muted);
+      opacity: 0.6;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="logo">Chromatic Realms</div>
+  <div id="loading">Loading</div>
+
+  <div class="ui-layer" id="ui-layer">
+    <!-- Top -->
+    <div class="brand">Chromatic Realms</div>
+    <div class="index" id="index">01 / 05</div>
+
+    <!-- Chair title - asymmetric -->
+    <div class="chair-title">
+      <div class="chair-name" id="chair-name">Cumulus</div>
+      <div class="chair-variant" id="chair-variant">Swivel Chair</div>
+    </div>
+
+    <!-- Vertical accent line -->
+    <div class="vertical-line"></div>
+
+    <!-- Specs table -->
+    <div class="specs-block">
+      <div class="specs-table">
+        <div class="spec-row">
+          <span class="spec-label">Material</span>
+          <span class="spec-value" id="spec-material">Bouclé Wool</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Width</span>
+          <span class="spec-value" id="spec-width">95 cm</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Depth</span>
+          <span class="spec-value" id="spec-depth">92 cm</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Height</span>
+          <span class="spec-value" id="spec-height">78 cm</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Price -->
+    <div class="price-block">
+      <div class="price-label">Price</div>
+      <div class="price-value" id="price-value">$4,200</div>
+    </div>
+
+    <!-- Description - right side -->
+    <div class="description-block">
+      <p class="description-text" id="description-text">Cloud-soft bouclé curves cradle you in weightless comfort. Each pleat catches light like morning mist.</p>
+    </div>
+
+    <!-- Bottom -->
+    <div class="hint">Drag to orbit</div>
+    <div class="realm-indicator">
+      <div class="realm-label" id="realm-label">Cloud Kingdom</div>
+    </div>
   </div>
-  <div id="loading">Entering world...</div>
-  <div class="hint">Drag to orbit • Scroll to zoom</div>
+
   <script type="module" src="/main.js"></script>
 </body>
 </html>
